@@ -1,27 +1,13 @@
 import React from 'react';
-import { withStyles } from '@material-ui/core/styles';
-import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
-import CardHeader from '@material-ui/core/CardHeader';
 import Grid from '@material-ui/core/Grid';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import ListItemText from '@material-ui/core/ListItemText';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableCell from '@material-ui/core/TableCell';
-import TableContainer from '@material-ui/core/TableContainer';
-import TableHead from '@material-ui/core/TableHead';
-import TableRow from '@material-ui/core/TableRow';
 import Typography from '@material-ui/core/Typography';
+import Appointments from './Appointments';
 import ApiCalls from './apiCalls'
 
-const StyledTableCell = withStyles((theme) => ({
-  head: {
-    backgroundColor: theme.palette.common.black,
-    color: theme.palette.common.white,
-  }
-}))(TableCell);
+
 
 class App extends React.Component {
   constructor(props) {
@@ -42,8 +28,11 @@ class App extends React.Component {
   getPhysicians = () => {
     ApiCalls.getPhysicians()
     .then(
-      (physicians) => {
-        this.setState({physicians})
+      (res) => {
+        if (res && res.status === 200) {
+          this.setState({physicians: res.data})
+        }
+        
       });
   }
 
@@ -57,14 +46,49 @@ class App extends React.Component {
   getAppointments = (id) => {
     ApiCalls.getAppointments(id)
     .then(
-      (appointments) => {
-        this.setState({appointments});
+      (res) => {
+        if (res && res.status === 200) {
+
+          let appointments = res.data.sort((a, b) => {
+            if (Date.parse(a.time) !== Date.parse(b.time)) {
+              return Date.parse(a.time) - Date.parse(b.time);
+            } else {
+              return a.patientName - b.patientName
+            }
+          });
+
+          appointments.forEach( item => {
+            item.time = new Date(item.time).toLocaleString()
+          })
+          
+          this.setState({appointments});
+        }
+        
+      })
+  }
+
+  deleteAppointment = (physicianId, time) => {
+
+    ApiCalls.deleteAppointment(physicianId, time)
+    .then(
+      (res)=> {
+        if (res === 'OK') {
+          const {selected} = this.state
+          if (selected.id === physicianId) {
+            this.getAppointments(physicianId);
+          }
+        } else {
+
+          alert(res)
+        }       
+        
       })
   }
 
   render() {
-    const {classes} = this.props;
     const {physicians, selected, appointments} = this.state;
+
+    
 
     return (
       <Grid
@@ -85,7 +109,7 @@ class App extends React.Component {
               physicians
             </Typography>
           </ListItem>
-          {physicians.map((physician, i) => {
+          {physicians && physicians.map((physician, i) => {
             return (
               <ListItem
                 button
@@ -99,51 +123,16 @@ class App extends React.Component {
           })}
           </List>
         </Grid>
-        <Grid
-          item 
-          xs={6}
-          md={9}
-        >
-          <Card >
-            <CardHeader
-              title={selected?"Dr. "+selected.firstName+" "+selected.lastName:"Please select a physician from the left to view."}
-              subheader={selected? selected.email:""}
-            />
-          
-            {selected && 
-              <CardContent>
-                <TableContainer >
-                  <Table className={classes.table} aria-label="customized table">
-                    <TableHead>
-                      <TableRow>
-                        <StyledTableCell>#</StyledTableCell>
-                        <StyledTableCell align="right">Name</StyledTableCell>
-                        <StyledTableCell align="right">Time</StyledTableCell>
-                        <StyledTableCell align="right">Kind</StyledTableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {appointments.map((row) => (
-                        <TableRow key={row.appointmentNumber}>
-                          <StyledTableCell component="th" scope="row">
-                            {row.appointmentNumber}
-                          </StyledTableCell>
-                          <StyledTableCell align="right">{row.patientName}</StyledTableCell>
-                          <StyledTableCell align="right">{row.time}</StyledTableCell>
-                          <StyledTableCell align="right">{row.kind}</StyledTableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            }
-          </Card>
-        </Grid>
-          
+        <Appointments 
+          selected={selected}
+          appointments = {appointments} 
+          onAppointmentDelete={this.deleteAppointment}
+          getAppointments={this.getAppointments}
+        />
+        
       </Grid>
     );
   }
 }
 
-export default withStyles()(App);
+export default App;
